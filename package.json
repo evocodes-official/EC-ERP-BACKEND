@@ -1,0 +1,35 @@
+{
+  "name": "ec-erp-backend",
+  "version": "1.0.0",
+  "description": "Backend for EC-ERP",
+  "keywords": [
+    "ERP",
+    "EC-ERP",
+    "EvoCodes",
+    "EVOCODES"
+  ],
+  "homepage": "https://github.com/evocodes-official/EC-ERP-BACKEND#readme",
+  "bugs": {
+    "url": "https://github.com/evocodes-official/EC-ERP-BACKEND/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/evocodes-official/EC-ERP-BACKEND.git"
+  },
+  "license": "ISC",
+  "author": "Arun Meyyappan P L, Aswin G, Deepak Kumar N",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "test": "npm start / node server.js",
+    "start": "nodemon server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
