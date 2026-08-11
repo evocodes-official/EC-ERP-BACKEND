@@ -25,8 +25,8 @@ const Stage = mongoose.model('Stage', stageSchema);
 const dealSchema = new mongoose.Schema({
   companyName: { type: String, required: true },
   amount: { type: Number, required: true },
-  stageId: { type: mongoose.Schema.Types.ObjectId, ref: 'Stage', required: true },
-  assigneeId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  stageId: { type: String, required: true },
+  assigneeId: { type: String, },
   description: { type: String }, 
   tagLabel: { type: String },  
   tagTheme: { type: String },  
