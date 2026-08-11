@@ -12,15 +12,17 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use("/api", require("./routes/route"));
 
+// Safer startup sequence
 const startServer = async () => {
-  await connectDB();
-  app.listen(process.env.PORT, () => {
-    console.log(
-      "✅ Server being at : " + `http://locahost:${process.env.PORT}`);
-  });
+  try {
+    await connectDB();
+    app.listen(process.env.PORT, () => {
+      console.log(`✅ Server running at : http://localhost:${process.env.PORT}`);
+    });
+  } catch (err) {
+    console.error("❌ Error starting server:", err);
+    process.exit(1);
+  }
 };
-try {
-  startServer();
-} catch (err) {
-  console.log("Error: ", err);
-}
+
+startServer();
