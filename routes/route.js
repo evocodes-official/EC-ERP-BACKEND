@@ -19,6 +19,15 @@ const {
   deleteDeal
 } = require('../controllers/crmController');
 
+// Import the HR controllers
+const {
+  getEmployees,
+  getEmployeeById,
+  createEmployee,
+  updateEmployee,
+  deleteEmployee
+} = require('../controllers/hrController');
+
 // ==========================================
 // Board Routes
 // ==========================================
@@ -31,6 +40,12 @@ router.post('/deals', createDeal);
 router.get('/deals/:id', getDealById);
 router.put('/deals/:id', updateDeal);
 router.delete('/deals/:id', deleteDeal);
+
+// ==========================================
+// HR Employee Routes
+// ==========================================
+router.route("/employees").get(getEmployees).post(createEmployee);
+router.route("/employees/:id").get(getEmployeeById).put(updateEmployee).delete(deleteEmployee);
 
 // ==========================================
 // Scales Routes
