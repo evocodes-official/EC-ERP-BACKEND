@@ -28,6 +28,9 @@ const {
   deleteEmployee
 } = require('../controllers/hrController');
 
+// Import the Dashboard controller
+const { getDashboardData } = require('../controllers/dashboardController');
+
 // ==========================================
 // Board Routes
 // ==========================================
@@ -52,5 +55,10 @@ router.route("/employees/:id").get(getEmployeeById).put(updateEmployee).delete(d
 // ==========================================
 router.route("/sales").get(getScales).post(createScale);
 router.route("/sales/:id").get(getScaleById).put(updateScale).delete(deleteScale);
+
+// ==========================================
+// Dashboard Routes
+// ==========================================
+router.get('/dashboard', getDashboardData);
 
 module.exports = router;
