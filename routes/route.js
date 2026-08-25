@@ -40,6 +40,9 @@ const { getDashboardData } = require('../controllers/dashboardController');
 // Import the Profile controller
 const { getProfile, updateProfile } = require('../controllers/profileController');
 
+// Import the Upload controller
+const { uploadImage } = require('../controllers/uploadController');
+
 // Import the Auth controller
 const { register, login, getMe, googleCallback } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
@@ -131,6 +134,11 @@ router.get('/dashboard', getDashboardData);
 // ==========================================
 router.get('/profile', getProfile);
 router.put('/profile', updateProfile);
+
+// ==========================================
+// Upload Routes
+// ==========================================
+router.post('/upload', uploadImage);
 
 // ==========================================
 // Auth Routes
