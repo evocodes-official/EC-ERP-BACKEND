@@ -34,6 +34,10 @@ const { getDashboardData } = require('../controllers/dashboardController');
 // Import the Profile controller
 const { getProfile, updateProfile } = require('../controllers/profileController');
 
+// Import the Auth controller
+const { register, login, getMe, googleCallback } = require('../controllers/authController');
+const { protect } = require('../middleware/auth');
+
 // Import the Project & Task controllers
 const {
   getProjects,
@@ -114,5 +118,13 @@ router.get('/dashboard', getDashboardData);
 // ==========================================
 router.get('/profile', getProfile);
 router.put('/profile', updateProfile);
+
+// ==========================================
+// Auth Routes
+// ==========================================
+router.post('/auth/register', register);
+router.post('/auth/login', login);
+router.get('/auth/me', protect, getMe);
+router.get('/auth/google/callback', googleCallback);
 
 module.exports = router;
