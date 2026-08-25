@@ -28,6 +28,9 @@ const {
   deleteEmployee
 } = require('../controllers/hrController');
 
+// Import the Dashboard controller
+const { getDashboardData } = require('../controllers/dashboardController');
+
 // Import the Project & Task controllers
 const {
   getProjects,
@@ -97,5 +100,10 @@ router.post("/projects/:projectId/tasks", createTask);
 const taskRoute = router.route("/projects/tasks/:taskId");
 if (updateTask) taskRoute.patch(updateTask);
 if (deleteTask) taskRoute.delete(deleteTask);
+
+// ==========================================
+// Dashboard Routes
+// ==========================================
+router.get('/dashboard', getDashboardData);
 
 module.exports = router;
