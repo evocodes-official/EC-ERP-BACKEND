@@ -139,6 +139,7 @@ router.put('/profile', updateProfile);
 // Upload Routes
 // ==========================================
 router.post('/upload', uploadImage);
+router.post('/upload/public', uploadImage);
 
 // ==========================================
 // Auth Routes
