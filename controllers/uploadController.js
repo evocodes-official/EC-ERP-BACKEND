@@ -34,26 +34,42 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5 MB
 });
 
-// Handle single image upload (field name: "image")
-exports.uploadImage = [
-  upload.single('image'),
-  (req, res) => {
+// Handle image upload — accepts the file under ANY form field name,
+// with explicit error handling so multer issues return clear 400s
+// instead of Express's generic 500.
+exports.uploadImage = (req, res) => {
+  upload.any()(req, res, (err) => {
+    if (err) {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ message: 'File is too large. Maximum size is 5 MB.' });
+        }
+        if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+          return res.status(400).json({ message: 'Too many files. Please upload a single image.' });
+        }
+        return res.status(400).json({ message: `Upload failed: ${err.message}` });
+      }
+      // Custom filter error (e.g. non-image file)
+      return res.status(400).json({ message: err.message });
+    }
+
     try {
-      if (!req.file) {
+      const file = req.file || (req.files && req.files[0]);
+      if (!file) {
         return res.status(400).json({ message: 'No image file provided.' });
       }
       // Build a fully-qualified URL so the frontend can use it directly
       const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const url = `${baseUrl}/uploads/${req.file.filename}`;
+      const url = `${baseUrl}/uploads/${file.filename}`;
 
       res.status(201).json({
         message: 'Image uploaded successfully',
         url,
-        path: `/uploads/${req.file.filename}`,
-        filename: req.file.filename
+        path: `/uploads/${file.filename}`,
+        filename: file.filename
       });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
-  }
-];
+  });
+};
