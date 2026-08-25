@@ -1,6 +1,12 @@
 const express = require("express");
 const router = express.Router();
 
+const {
+  getSettings,
+  updateSettings,
+  updatePassword
+} = require('../controllers/settingController');
+
 // Import your existing scales controller
 const {
   getScales,
@@ -35,9 +41,9 @@ const { getDashboardData } = require('../controllers/dashboardController');
 const {
   getProjects,
   createProject,
+  deleteProject,
 } = require('../controllers/projectController');
 const {
- 
   createTask,
   updateTask,
   deleteTask
@@ -95,12 +101,19 @@ if (getProjects || createProject) {
   if (createProject) projRoute.post(createProject);
 }
 
+if (deleteProject) {
+  router.delete("/projects/:id", deleteProject);
+}
+
 router.post("/projects/:projectId/tasks", createTask);
 
 const taskRoute = router.route("/projects/tasks/:taskId");
 if (updateTask) taskRoute.patch(updateTask);
 if (deleteTask) taskRoute.delete(deleteTask);
 
+router.get('/setting', getSettings);
+router.put('/setting', updateSettings);
+router.post('/password', updatePassword);
 // ==========================================
 // Dashboard Routes
 // ==========================================

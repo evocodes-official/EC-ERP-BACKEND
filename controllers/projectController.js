@@ -33,3 +33,18 @@ exports.createProject = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+exports.deleteProject = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedProject = await Project.findByIdAndDelete(id);
+    
+    if (!deletedProject) return res.status(404).json({ message: 'Project not found' });
+
+    // Also remove tasks associated with this project
+    await Task.deleteMany({ projectId: id });
+
+    res.status(200).json({ message: 'Project deleted successfully', id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
