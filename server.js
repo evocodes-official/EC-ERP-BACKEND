@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require("cors"); // Import cors
 const connectDB = require("./config/db");
 const dotenv = require("dotenv");
 dotenv.config();
@@ -6,6 +7,7 @@ dotenv.config();
 const app = express();
 
 // Middleware
+app.use(cors()); // Enable CORS for all routes and origins
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
