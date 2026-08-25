@@ -1,13 +1,9 @@
 const mongoose = require('mongoose');
 
 // ==========================================
-// 1. User Model
+// User Model (imported from auth User model)
 // ==========================================
-const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  avatarUrl: { type: String }
-});
-const User = mongoose.model('User', userSchema);
+const User = require('./User');
 
 // ==========================================
 // 2. Stage Model
