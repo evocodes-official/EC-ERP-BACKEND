@@ -31,6 +31,9 @@ const {
 // Import the Dashboard controller
 const { getDashboardData } = require('../controllers/dashboardController');
 
+// Import the Profile controller
+const { getProfile, updateProfile } = require('../controllers/profileController');
+
 // Import the Project & Task controllers
 const {
   getProjects,
@@ -105,5 +108,11 @@ if (deleteTask) taskRoute.delete(deleteTask);
 // Dashboard Routes
 // ==========================================
 router.get('/dashboard', getDashboardData);
+
+// ==========================================
+// Profile Routes
+// ==========================================
+router.get('/profile', getProfile);
+router.put('/profile', updateProfile);
 
 module.exports = router;
