@@ -61,6 +61,15 @@ const {
 } = require('../controllers/paymentController');
 const { getFinanceStats } = require('../controllers/financeController');
 
+// Import the Inventory controller
+const {
+  getInventoryItems,
+  getInventoryItemById,
+  createInventoryItem,
+  updateInventoryItem,
+  deleteInventoryItem,
+} = require('../controllers/inventoryController');
+
 
 // Import the Profile controller
 const { getProfile, updateProfile } = require('../controllers/profileController');
@@ -198,6 +207,21 @@ if (getPaymentById || updatePayment || deletePayment) {
   if (getPaymentById) paymentIdRoute.get(getPaymentById);
   if (updatePayment) paymentIdRoute.put(updatePayment);
   if (deletePayment) paymentIdRoute.delete(deletePayment);
+}
+
+// ==========================================
+// Inventory Routes
+// ==========================================
+if (getInventoryItems || createInventoryItem) {
+  const inventoryRoute = router.route("/inventory");
+  if (getInventoryItems) inventoryRoute.get(getInventoryItems);
+  if (createInventoryItem) inventoryRoute.post(createInventoryItem);
+}
+if (getInventoryItemById || updateInventoryItem || deleteInventoryItem) {
+  const inventoryIdRoute = router.route("/inventory/:id");
+  if (getInventoryItemById) inventoryIdRoute.get(getInventoryItemById);
+  if (updateInventoryItem) inventoryIdRoute.put(updateInventoryItem);
+  if (deleteInventoryItem) inventoryIdRoute.delete(deleteInventoryItem);
 }
 
 

@@ -90,14 +90,14 @@ invoiceSchema.virtual("paid").get(function () {
 });
 
 // If no explicit amount was provided but line items exist, compute it
-invoiceSchema.pre("validate", function (next) {
+// (Mongoose 9: middleware does not receive a `next` callback)
+invoiceSchema.pre("validate", function () {
   if (this.isModified("items") && this.items.length > 0) {
     this.amount = this.items.reduce(
       (sum, item) => sum + item.quantity * item.unitPrice,
       0
     );
   }
-  next();
 });
 
 module.exports = mongoose.model("Invoice", invoiceSchema);
