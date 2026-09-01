@@ -37,6 +37,31 @@ const {
 // Import the Dashboard controller
 const { getDashboardData } = require('../controllers/dashboardController');
 
+// Import the Finance controllers (Invoices, Expenses, Payments, Stats)
+const {
+  getInvoices,
+  getInvoiceById,
+  createInvoice,
+  updateInvoice,
+  deleteInvoice,
+} = require('../controllers/invoiceController');
+const {
+  getExpenses,
+  getExpenseById,
+  createExpense,
+  updateExpense,
+  deleteExpense,
+} = require('../controllers/expenseController');
+const {
+  getPayments,
+  getPaymentById,
+  createPayment,
+  updatePayment,
+  deletePayment,
+} = require('../controllers/paymentController');
+const { getFinanceStats } = require('../controllers/financeController');
+
+
 // Import the Profile controller
 const { getProfile, updateProfile } = require('../controllers/profileController');
 
@@ -128,6 +153,53 @@ router.post('/password', updatePassword);
 // Dashboard Routes
 // ==========================================
 router.get('/dashboard', getDashboardData);
+
+// ==========================================
+// Finance Routes
+// ==========================================
+
+// Finance overview stats (revenue, expenses, net profit, taxes)
+if (getFinanceStats) router.get('/finance/stats', getFinanceStats);
+
+// Invoice Routes
+if (getInvoices || createInvoice) {
+  const invoiceRoute = router.route("/invoices");
+  if (getInvoices) invoiceRoute.get(getInvoices);
+  if (createInvoice) invoiceRoute.post(createInvoice);
+}
+if (getInvoiceById || updateInvoice || deleteInvoice) {
+  const invoiceIdRoute = router.route("/invoices/:id");
+  if (getInvoiceById) invoiceIdRoute.get(getInvoiceById);
+  if (updateInvoice) invoiceIdRoute.put(updateInvoice);
+  if (deleteInvoice) invoiceIdRoute.delete(deleteInvoice);
+}
+
+// Expense Routes
+if (getExpenses || createExpense) {
+  const expenseRoute = router.route("/expenses");
+  if (getExpenses) expenseRoute.get(getExpenses);
+  if (createExpense) expenseRoute.post(createExpense);
+}
+if (getExpenseById || updateExpense || deleteExpense) {
+  const expenseIdRoute = router.route("/expenses/:id");
+  if (getExpenseById) expenseIdRoute.get(getExpenseById);
+  if (updateExpense) expenseIdRoute.put(updateExpense);
+  if (deleteExpense) expenseIdRoute.delete(deleteExpense);
+}
+
+// Payment Routes
+if (getPayments || createPayment) {
+  const paymentRoute = router.route("/payments");
+  if (getPayments) paymentRoute.get(getPayments);
+  if (createPayment) paymentRoute.post(createPayment);
+}
+if (getPaymentById || updatePayment || deletePayment) {
+  const paymentIdRoute = router.route("/payments/:id");
+  if (getPaymentById) paymentIdRoute.get(getPaymentById);
+  if (updatePayment) paymentIdRoute.put(updatePayment);
+  if (deletePayment) paymentIdRoute.delete(deletePayment);
+}
+
 
 // ==========================================
 // Profile Routes
