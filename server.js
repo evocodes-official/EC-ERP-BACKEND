@@ -17,8 +17,11 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 app.use(cors(corsOptions));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Increased body limit so larger JSON payloads (e.g. inline images) don't
+// fail with 413 "request entity too large". Images should preferably be
+// uploaded via POST /api/upload instead of embedding base64 in JSON.
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 // Serve uploaded files statically
 app.use("/uploads", express.static(require("path").join(__dirname, "uploads")));
