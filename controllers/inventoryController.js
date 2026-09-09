@@ -1,13 +1,17 @@
 const Inventory = require("../models/Inventory");
+const config = require("../config/jwt");
 
-// @desc    Get all inventory items (optionally filter by ?status=In%20Stock or ?search=keyword)
-// @route   GET /api/inventory
-// @access  Public
 const getInventoryItems = async (req, res) => {
   try {
     const filter = {};
     if (req.query.category) {
       filter.category = req.query.category;
+    }
+    if (req.query.search) {
+      filter.$or = [
+        { name: { $regex: req.query.search, $options: "i" } },
+        { sku: { $regex: req.query.search, $options: "i" } },
+      ];
     }
     const items = await Inventory.find(filter).sort({ createdAt: -1 });
     res.status(200).json({
@@ -19,14 +23,11 @@ const getInventoryItems = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while fetching inventory items",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Get single inventory item by ID
-// @route   GET /api/inventory/:id
-// @access  Public
 const getInventoryItemById = async (req, res) => {
   try {
     const item = await Inventory.findById(req.params.id);
@@ -44,14 +45,11 @@ const getInventoryItemById = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while fetching inventory item",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Create a new inventory item
-// @route   POST /api/inventory
-// @access  Public
 const createInventoryItem = async (req, res) => {
   try {
     const { name, sku } = req.body;
@@ -63,7 +61,6 @@ const createInventoryItem = async (req, res) => {
       });
     }
 
-    // Keep SKUs unique so stock records never collide
     const existing = await Inventory.findOne({
       sku: String(sku).toUpperCase(),
     });
@@ -85,19 +82,15 @@ const createInventoryItem = async (req, res) => {
     res.status(400).json({
       success: false,
       message: "Failed to create inventory item",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Update an existing inventory item
-// @route   PUT /api/inventory/:id
-// @access  Public
 const updateInventoryItem = async (req, res) => {
   try {
     const { sku } = req.body;
 
-    // If renaming the SKU, make sure it isn't taken by another record
     if (sku) {
       const duplicate = await Inventory.findOne({
         sku: String(sku).toUpperCase(),
@@ -130,14 +123,11 @@ const updateInventoryItem = async (req, res) => {
     res.status(400).json({
       success: false,
       message: "Failed to update inventory item",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Delete an inventory item
-// @route   DELETE /api/inventory/:id
-// @access  Public
 const deleteInventoryItem = async (req, res) => {
   try {
     const item = await Inventory.findByIdAndDelete(req.params.id);
@@ -155,7 +145,7 @@ const deleteInventoryItem = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while deleting inventory item",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };

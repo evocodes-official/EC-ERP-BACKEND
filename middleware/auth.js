@@ -1,12 +1,11 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const config = require("../config/jwt");
 
-// @desc    Protect route - verify JWT token
 const protect = async (req, res, next) => {
   try {
     let token;
 
-    // Check for token in Authorization header
     if (
       req.headers.authorization &&
       req.headers.authorization.startsWith("Bearer")
@@ -21,11 +20,9 @@ const protect = async (req, res, next) => {
       });
     }
 
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, config.JWT_SECRET);
 
-    // Get user from token (excluding password)
-    const user = await User.findById(decoded.id).select("-password");
+    const user = await User.findById(decoded.id);
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -36,12 +33,36 @@ const protect = async (req, res, next) => {
     req.user = user;
     next();
   } catch (err) {
+    if (err.name === "JsonWebTokenError") {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token",
+      });
+    }
+    if (err.name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        message: "Token expired",
+      });
+    }
     return res.status(401).json({
       success: false,
       message: "Not authorized to access this route",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-module.exports = { protect };
+const authorize = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to access this route",
+      });
+    }
+    next();
+  };
+};
+
+module.exports = { protect, authorize };

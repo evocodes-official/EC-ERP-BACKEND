@@ -1,9 +1,6 @@
 const Invoice = require("../models/Invoice");
+const config = require("../config/jwt");
 
-/**
- * Generate the next invoice number in the format INV-<YEAR>-<SEQ>,
- * e.g. INV-2026-001. Falls back gracefully on collisions.
- */
 const generateInvoiceNumber = async () => {
   const year = new Date().getFullYear();
   const count = await Invoice.countDocuments({
@@ -12,7 +9,6 @@ const generateInvoiceNumber = async () => {
   let seq = count + 1;
   let invoiceNumber = `INV-${year}-${String(seq).padStart(3, "0")}`;
 
-  // Guard against gaps/collisions in the sequence
   while (await Invoice.exists({ invoiceNumber })) {
     seq += 1;
     invoiceNumber = `INV-${year}-${String(seq).padStart(3, "0")}`;
@@ -20,9 +16,6 @@ const generateInvoiceNumber = async () => {
   return invoiceNumber;
 };
 
-// @desc    Get all invoices (optionally filter by ?status=PAID)
-// @route   GET /api/invoices
-// @access  Public
 const getInvoices = async (req, res) => {
   try {
     const filter = {};
@@ -39,14 +32,11 @@ const getInvoices = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while fetching invoices",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Get single invoice by ID
-// @route   GET /api/invoices/:id
-// @access  Public
 const getInvoiceById = async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id);
@@ -64,14 +54,11 @@ const getInvoiceById = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while fetching invoice",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Create a new invoice
-// @route   POST /api/invoices
-// @access  Public
 const createInvoice = async (req, res) => {
   try {
     const payload = { ...req.body };
@@ -94,14 +81,11 @@ const createInvoice = async (req, res) => {
     res.status(400).json({
       success: false,
       message: "Failed to create invoice",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Update an existing invoice
-// @route   PUT /api/invoices/:id
-// @access  Public
 const updateInvoice = async (req, res) => {
   try {
     const invoice = await Invoice.findByIdAndUpdate(req.params.id, req.body, {
@@ -129,14 +113,11 @@ const updateInvoice = async (req, res) => {
     res.status(400).json({
       success: false,
       message: "Failed to update invoice",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Delete an invoice
-// @route   DELETE /api/invoices/:id
-// @access  Public
 const deleteInvoice = async (req, res) => {
   try {
     const invoice = await Invoice.findByIdAndDelete(req.params.id);
@@ -154,7 +135,7 @@ const deleteInvoice = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while deleting invoice",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };

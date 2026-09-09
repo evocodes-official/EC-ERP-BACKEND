@@ -1,6 +1,6 @@
 const Employee = require("../models/HR");
+const config = require("../config/jwt");
 
-// Helper: Map department to style
 const getDeptStyle = (dept) => {
   switch (dept) {
     case "Engineering": return "bg-blue-50 text-blue-600";
@@ -13,7 +13,6 @@ const getDeptStyle = (dept) => {
   }
 };
 
-// Helper: Map attendance to dot style
 const getAttendanceDot = (attendance) => {
   switch (attendance) {
     case "On-site": return "bg-emerald-500";
@@ -24,17 +23,18 @@ const getAttendanceDot = (attendance) => {
   }
 };
 
-// @desc    Get all employees (with search, filter, sort)
-// @route   GET /api/employees
-// @access  Public
+const getPerfColor = (performance) => {
+  if (performance >= 90) return "bg-emerald-500";
+  if (performance >= 75) return "bg-blue-600";
+  return "bg-slate-400";
+};
+
 const getEmployees = async (req, res) => {
   try {
     const { search, dept, attendance, sort } = req.query;
 
-    // Build query
     let query = {};
 
-    // Search filter (name, email, dept, role)
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: "i" } },
@@ -44,18 +44,15 @@ const getEmployees = async (req, res) => {
       ];
     }
 
-    // Department filter
     if (dept && dept !== "All Departments") {
       query.dept = dept;
     }
 
-    // Attendance filter
     if (attendance && attendance !== "All Attendance") {
       query.attendance = attendance;
     }
 
-    // Sort config
-    let sortConfig = { joinedDate: -1 }; // newest first by default
+    let sortConfig = { joinedDate: -1 };
     if (sort === "oldest") sortConfig = { joinedDate: 1 };
 
     const employees = await Employee.find(query).sort(sortConfig);
@@ -69,14 +66,11 @@ const getEmployees = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while fetching employees",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Get single employee by ID
-// @route   GET /api/employees/:id
-// @access  Public
 const getEmployeeById = async (req, res) => {
   try {
     const employee = await Employee.findById(req.params.id);
@@ -94,19 +88,22 @@ const getEmployeeById = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while fetching employee",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Create a new employee
-// @route   POST /api/employees
-// @access  Public
 const createEmployee = async (req, res) => {
   try {
     const { name, email, dept, role, attendance, avatar, performance, joinedDate } = req.body;
 
-    // Auto-generate style fields
+    if (!name || !email || !dept || !role || !attendance) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields: name, email, dept, role, attendance",
+      });
+    }
+
     const deptStyle = getDeptStyle(dept);
     const attendanceDot = getAttendanceDot(attendance);
 
@@ -120,7 +117,7 @@ const createEmployee = async (req, res) => {
       attendanceDot,
       avatar: avatar || "",
       performance: performance || 0,
-      perfColor: performance >= 90 ? "bg-emerald-500" : performance >= 75 ? "bg-blue-600" : "bg-slate-400",
+      perfColor: getPerfColor(performance || 0),
       joinedDate: joinedDate || Date.now(),
     });
 
@@ -139,23 +136,19 @@ const createEmployee = async (req, res) => {
     res.status(400).json({
       success: false,
       message: "Failed to create employee",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Update an existing employee
-// @route   PUT /api/employees/:id
-// @access  Public
 const updateEmployee = async (req, res) => {
   try {
     const { dept, attendance, performance } = req.body;
 
-    // Auto-update style fields if dept/attendance changed
     if (dept) req.body.deptStyle = getDeptStyle(dept);
     if (attendance) req.body.attendanceDot = getAttendanceDot(attendance);
     if (performance !== undefined) {
-      req.body.perfColor = performance >= 90 ? "bg-emerald-500" : performance >= 75 ? "bg-blue-600" : "bg-slate-400";
+      req.body.perfColor = getPerfColor(performance);
     }
 
     const employee = await Employee.findByIdAndUpdate(req.params.id, req.body, {
@@ -185,14 +178,11 @@ const updateEmployee = async (req, res) => {
     res.status(400).json({
       success: false,
       message: "Failed to update employee",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Delete an employee
-// @route   DELETE /api/employees/:id
-// @access  Public
 const deleteEmployee = async (req, res) => {
   try {
     const employee = await Employee.findByIdAndDelete(req.params.id);
@@ -210,7 +200,7 @@ const deleteEmployee = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while deleting employee",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };

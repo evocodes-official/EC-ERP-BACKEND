@@ -1,8 +1,6 @@
 const Scale = require("../models/Scale");
+const config = require("../config/jwt");
 
-// @desc    Get all scales
-// @route   GET /api/scales
-// @access  Public
 const getScales = async (req, res) => {
   try {
     const scales = await Scale.find();
@@ -15,14 +13,11 @@ const getScales = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while fetching scales",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Get single scale by ID
-// @route   GET /api/scales/:id
-// @access  Public
 const getScaleById = async (req, res) => {
   try {
     const scale = await Scale.findById(req.params.id);
@@ -40,14 +35,11 @@ const getScaleById = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while fetching scale",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Create a new scale
-// @route   POST /api/scales
-// @access  Public
 const createScale = async (req, res) => {
   try {
     const scale = await Scale.create(req.body);
@@ -66,14 +58,11 @@ const createScale = async (req, res) => {
     res.status(400).json({
       success: false,
       message: "Failed to create scale",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Update an existing scale
-// @route   PUT /api/scales/:id
-// @access  Public
 const updateScale = async (req, res) => {
   try {
     const scale = await Scale.findByIdAndUpdate(req.params.id, req.body, {
@@ -101,14 +90,11 @@ const updateScale = async (req, res) => {
     res.status(400).json({
       success: false,
       message: "Failed to update scale",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Delete a scale
-// @route   DELETE /api/scales/:id
-// @access  Public
 const deleteScale = async (req, res) => {
   try {
     const scale = await Scale.findByIdAndDelete(req.params.id);
@@ -126,7 +112,7 @@ const deleteScale = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while deleting scale",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };

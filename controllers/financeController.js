@@ -1,10 +1,8 @@
 const Invoice = require("../models/Invoice");
 const Expense = require("../models/Expense");
 const Payment = require("../models/Payment");
+const config = require("../config/jwt");
 
-// @desc    Get finance dashboard overview (revenue, expenses, net profit, taxes)
-// @route   GET /api/finance/stats
-// @access  Public
 const getFinanceStats = async (req, res) => {
   try {
     const [
@@ -15,27 +13,22 @@ const getFinanceStats = async (req, res) => {
       paymentsAgg,
       invoiceStatusCounts,
     ] = await Promise.all([
-      // Revenue = sum of all PAID invoices
       Invoice.aggregate([
         { $match: { status: "PAID" } },
         { $group: { _id: null, total: { $sum: "$amount" } } },
       ]),
-      // Outstanding = PENDING + OVERDUE invoices
       Invoice.aggregate([
         { $match: { status: { $in: ["PENDING", "OVERDUE"] } } },
         { $group: { _id: null, total: { $sum: "$amount" } } },
       ]),
-      // Expenses = all paid expenses
       Expense.aggregate([
         { $match: { status: "PAID" } },
         { $group: { _id: null, total: { $sum: "$amount" } } },
       ]),
-      // Taxes = expenses booked in the TAXES category
       Expense.aggregate([
         { $match: { category: "TAXES" } },
         { $group: { _id: null, total: { $sum: "$amount" } } },
       ]),
-      // Total completed payments received
       Payment.aggregate([
         { $match: { status: "COMPLETED" } },
         { $group: { _id: null, total: { $sum: "$amount" } } },
@@ -73,7 +66,7 @@ const getFinanceStats = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while fetching finance stats",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };

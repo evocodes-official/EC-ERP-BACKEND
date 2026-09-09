@@ -1,20 +1,21 @@
-const Profile = require("../models/Profile");
+const User = require("../models/User");
+const config = require("../config/jwt");
 
 // @desc    Get a user profile (by email) or return a default profile
 // @route   GET /api/profile?email=...
-// @access  Public
+// @access  Private
 const getProfile = async (req, res) => {
   try {
     const { email } = req.query;
 
-    if (email) {
-      const user = await Profile.findOne({ email });
-      if (user) {
-        return res.status(200).json({
-          success: true,
-          data: user,
-        });
-      }
+    const query = email ? { email } : { _id: req.user.id };
+
+    const user = await User.findOne(query);
+    if (user) {
+      return res.status(200).json({
+        success: true,
+        data: user,
+      });
     }
 
     // Return a default/demo profile when no saved profile exists
@@ -52,14 +53,14 @@ const getProfile = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while fetching profile",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
 // @desc    Save (create or update) a user profile
 // @route   PUT /api/profile
-// @access  Public
+// @access  Private
 const updateProfile = async (req, res) => {
   try {
     const {
@@ -77,16 +78,11 @@ const updateProfile = async (req, res) => {
       languages,
     } = req.body;
 
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: "Email is required to identify the profile",
-      });
-    }
+    const userEmail = email || req.user.email;
 
     const profileData = {
       name,
-      email,
+      email: userEmail,
       picture,
       role,
       department,
@@ -99,13 +95,16 @@ const updateProfile = async (req, res) => {
       languages,
     };
 
-    // Upsert: create if the profile doesn't exist, otherwise update
-    const user = await Profile.findOneAndUpdate({ email }, profileData, {
-      new: true,
-      upsert: true,
-      runValidators: true,
-      setDefaultsOnInsert: true,
-    });
+    const user = await User.findOneAndUpdate(
+      { email: userEmail },
+      profileData,
+      {
+        new: true,
+        upsert: true,
+        runValidators: true,
+        setDefaultsOnInsert: true,
+      }
+    );
 
     res.status(200).json({
       success: true,
@@ -122,7 +121,7 @@ const updateProfile = async (req, res) => {
     res.status(400).json({
       success: false,
       message: "Failed to save profile",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };

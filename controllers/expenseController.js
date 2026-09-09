@@ -1,8 +1,6 @@
 const Expense = require("../models/Expense");
+const config = require("../config/jwt");
 
-// @desc    Get all expenses (optionally filter by ?category=TAXES or ?status=PENDING)
-// @route   GET /api/expenses
-// @access  Public
 const getExpenses = async (req, res) => {
   try {
     const filter = {};
@@ -22,14 +20,11 @@ const getExpenses = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while fetching expenses",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Get single expense by ID
-// @route   GET /api/expenses/:id
-// @access  Public
 const getExpenseById = async (req, res) => {
   try {
     const expense = await Expense.findById(req.params.id);
@@ -47,14 +42,11 @@ const getExpenseById = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while fetching expense",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Create a new expense
-// @route   POST /api/expenses
-// @access  Public
 const createExpense = async (req, res) => {
   try {
     const expense = await Expense.create(req.body);
@@ -67,14 +59,11 @@ const createExpense = async (req, res) => {
     res.status(400).json({
       success: false,
       message: "Failed to create expense",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Update an existing expense
-// @route   PUT /api/expenses/:id
-// @access  Public
 const updateExpense = async (req, res) => {
   try {
     const expense = await Expense.findByIdAndUpdate(req.params.id, req.body, {
@@ -96,14 +85,11 @@ const updateExpense = async (req, res) => {
     res.status(400).json({
       success: false,
       message: "Failed to update expense",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
 
-// @desc    Delete an expense
-// @route   DELETE /api/expenses/:id
-// @access  Public
 const deleteExpense = async (req, res) => {
   try {
     const expense = await Expense.findByIdAndDelete(req.params.id);
@@ -121,7 +107,7 @@ const deleteExpense = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while deleting expense",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };

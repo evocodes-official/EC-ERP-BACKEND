@@ -2,16 +2,8 @@ const Employee = require("../models/HR");
 const { Deal, User } = require("../models/crm");
 const Project = require("../models/project");
 const Task = require("../models/task");
+const config = require("../config/jwt");
 
-// =========================================================
-// Helpers
-// =========================================================
-
-/**
- * Build an array of month metadata for the last N months.
- * Each entry: label (short month name), year, month (1-12),
- * startDate / endDate Date objects.
- */
 const getLastNMonths = (n = 7) => {
   const months = [];
   const now = new Date();
@@ -28,10 +20,8 @@ const getLastNMonths = (n = 7) => {
   return months;
 };
 
-/** Composite key for a year-month pair. */
 const monthKey = (year, month) => `${year}-${month}`;
 
-/** Calculate percentage trend between current and previous values. */
 const calcTrend = (current, previous) => {
   if (previous > 0) {
     return Math.round(((current - previous) / previous) * 1000) / 10;
@@ -39,13 +29,6 @@ const calcTrend = (current, previous) => {
   return current > 0 ? 100 : 0;
 };
 
-// =========================================================
-// Dashboard Controller
-// =========================================================
-
-// @desc    Get all dashboard data (KPIs, charts, hierarchy, sales)
-// @route   GET /api/dashboard
-// @access  Public
 const getDashboardData = async (req, res) => {
   try {
     const now = new Date();
@@ -63,7 +46,6 @@ const getDashboardData = async (req, res) => {
     const execRolePattern =
       /manager|director|vp|chief|officer|head|lead|president|cto|ceo|cfo|coo|cmo|cio|ciso|cxo/i;
 
-    // Run all independent database operations in parallel
     const [
       totalEmployees,
       newHiresCurrent,
@@ -75,7 +57,6 @@ const getDashboardData = async (req, res) => {
       users,
       employees,
       managers,
-      // --- Project & Task (workspace) data ---
       projects,
       pendingTasksCount,
       tasksCreatedRecent,
@@ -111,7 +92,6 @@ const getDashboardData = async (req, res) => {
       User.find().lean(),
       Employee.find().lean(),
       Employee.find({ role: { $regex: execRolePattern } }).sort({ joinedDate: 1 }).limit(6).lean(),
-      // --- Project & Task (workspace) data ---
       Project.find().sort({ createdAt: -1 }).lean(),
       Task.countDocuments({ status: { $ne: "done" } }),
       Task.countDocuments({ createdAt: { $gte: thirtyDaysAgo } }),
@@ -139,7 +119,6 @@ const getDashboardData = async (req, res) => {
         .lean(),
     ]);
 
-    // ---- KPIs ----
     const totalEmployeesValue = totalEmployees;
     const employeeTrend = calcTrend(newHiresCurrent, newHiresPrevious);
 
@@ -147,18 +126,14 @@ const getDashboardData = async (req, res) => {
     const prevRevenue = revenuePreviousAgg.length > 0 ? revenuePreviousAgg[0].total : 0;
     const revenueTrend = calcTrend(monthlyRevenue, prevRevenue);
 
-    // ---- Revenue vs Expenses chart (last 7 months) ----
     const revenueMap = {};
     for (const item of monthlyRevenueAgg) {
       revenueMap[monthKey(item._id.year, item._id.month)] = item.total;
     }
     const monthLabels = months.map((m) => m.label);
     const revenueByMonth = months.map((m) => revenueMap[monthKey(m.year, m.month)] || 0);
-    // Expenses: no finance/expense model exists yet — return zeros
     const expensesByMonth = new Array(months.length).fill(0);
 
-    // ---- Sales by Department ----
-    // Chain: Deal.assigneeId -> User._id -> User.name -> Employee.name -> Employee.dept
     const userIdToName = {};
     for (const user of users) {
       userIdToName[user._id.toString()] = user.name;
@@ -190,7 +165,6 @@ const getDashboardData = async (req, res) => {
       }))
       .sort((a, b) => b.revenue - a.revenue);
 
-    // ---- Management Hierarchy ----
     const managementHierarchy = managers.map((emp) => ({
       name: emp.name,
       role: emp.role,
@@ -199,7 +173,6 @@ const getDashboardData = async (req, res) => {
       status: emp.attendance === "O.O.O" ? "away" : "active",
     }));
 
-    // ---- Active Projects KPI ----
     const activeProjectsValue = projects.length;
     const projectsCreatedCurrent = projects.filter(
       (p) => p.createdAt >= startOfMonth && p.createdAt < startOfNextMonth
@@ -209,16 +182,12 @@ const getDashboardData = async (req, res) => {
     ).length;
     const projectTrend = calcTrend(projectsCreatedCurrent, projectsCreatedPrevious);
 
-    // ---- Pending Tasks KPI ----
-    // Estimate the pending count as of 30 days ago to compute a trend:
-    // pendingThen ≈ currentPending - tasksCreatedSince + tasksCompletedSince
     const pendingThenEstimate = Math.max(
       0,
       pendingTasksCount - tasksCreatedRecent + tasksCompletedRecent
     );
     const pendingTasksTrend = calcTrend(pendingTasksCount, pendingThenEstimate);
 
-    // ---- Projects Overview (progress per project) ----
     const taskCountMap = {};
     for (const row of taskCountsByProject) {
       taskCountMap[row._id ? row._id.toString() : ""] = {
@@ -246,13 +215,11 @@ const getDashboardData = async (req, res) => {
       };
     });
 
-    // ---- Recent Activity ----
     const projectNameById = {};
     for (const project of projects) {
       projectNameById[project._id.toString()] = project.name;
     }
 
-    /** Convert a Date to a relative "time ago" label. */
     const timeAgo = (date) => {
       const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
       if (seconds < 60) return "Just now";
@@ -359,7 +326,7 @@ const getDashboardData = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while fetching dashboard data",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };

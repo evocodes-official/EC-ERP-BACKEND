@@ -1,5 +1,15 @@
 const express = require("express");
 const router = express.Router();
+const config = require("../config/jwt");
+const rateLimit = require("express-rate-limit");
+
+const authLimiter = rateLimit({
+  windowMs: config.RATE_LIMIT_WINDOW_MS,
+  max: config.AUTH_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: "Too many authentication attempts, please try again later" },
+});
 
 const {
   getSettings,
@@ -7,7 +17,6 @@ const {
   updatePassword
 } = require('../controllers/settingController');
 
-// Import your existing scales controller
 const {
   getScales,
   getScaleById,
@@ -16,7 +25,6 @@ const {
   deleteScale,
 } = require("../controllers/scaleController");
 
-// Import the new CRM controllers
 const {
   getBoard,
   getDealById,
@@ -25,7 +33,6 @@ const {
   deleteDeal
 } = require('../controllers/crmController');
 
-// Import the HR controllers
 const {
   getEmployees,
   getEmployeeById,
@@ -34,10 +41,20 @@ const {
   deleteEmployee
 } = require('../controllers/hrController');
 
-// Import the Dashboard controller
+const {
+  getProjects,
+  createProject,
+  deleteProject,
+} = require('../controllers/projectController');
+
+const {
+  createTask,
+  updateTask,
+  deleteTask,
+} = require('../controllers/taskController');
+
 const { getDashboardData } = require('../controllers/dashboardController');
 
-// Import the Finance controllers (Invoices, Expenses, Payments, Stats)
 const {
   getInvoices,
   getInvoiceById,
@@ -60,8 +77,8 @@ const {
   deletePayment,
 } = require('../controllers/paymentController');
 const { getFinanceStats } = require('../controllers/financeController');
+const { getReports } = require('../controllers/reportController');
 
-// Import the Inventory controller
 const {
   getInventoryItems,
   getInventoryItemById,
@@ -70,179 +87,162 @@ const {
   deleteInventoryItem,
 } = require('../controllers/inventoryController');
 
-
-// Import the Profile controller
 const { getProfile, updateProfile } = require('../controllers/profileController');
 
-// Import the Upload controller
 const { uploadImage } = require('../controllers/uploadController');
 
-// Import the Auth controller
-const { register, login, getMe, googleCallback } = require('../controllers/authController');
-const { protect } = require('../middleware/auth');
+const {
+  register,
+  login,
+  getMe,
+  refreshToken,
+  logout,
+  googleCallback
+} = require('../controllers/authController');
+const { protect, authorize } = require('../middleware/auth');
 
-// Import the Project & Task controllers
-const {
-  getProjects,
-  createProject,
-  deleteProject,
-} = require('../controllers/projectController');
-const {
-  createTask,
-  updateTask,
-  deleteTask
-} = require('../controllers/taskController');
+// ==========================================
+// Public Auth Routes (with rate limiting)
+// ==========================================
+router.post('/auth/register', authLimiter, register);
+router.post('/auth/login', authLimiter, login);
+router.post('/auth/refresh', authLimiter, refreshToken);
+router.get('/auth/google/callback', googleCallback);
+
+// ==========================================
+// Protected Auth Routes
+// ==========================================
+router.get('/auth/me', protect, getMe);
+router.post('/auth/logout', protect, logout);
+
+// ==========================================
+// Protected Profile Routes
+// ==========================================
+router.get('/profile', protect, getProfile);
+router.put('/profile', protect, updateProfile);
 
 // ==========================================
 // Board Routes
 // ==========================================
-if (getBoard) router.get('/board', getBoard);
+router.get('/board', getBoard);
 
 // ==========================================
 // Deal Routes
 // ==========================================
-if (createDeal) router.post('/deals', createDeal);
-if (getDealById) router.get('/deals/:id', getDealById);
-if (updateDeal) router.put('/deals/:id', updateDeal);
-if (deleteDeal) router.delete('/deals/:id', deleteDeal);
+router.post('/deals', createDeal);
+router.get('/deals/:id', getDealById);
+router.put('/deals/:id', updateDeal);
+router.delete('/deals/:id', deleteDeal);
 
 // ==========================================
 // HR Employee Routes
 // ==========================================
-if (getEmployees || createEmployee) {
-  const empRoute = router.route("/employees");
-  if (getEmployees) empRoute.get(getEmployees);
-  if (createEmployee) empRoute.post(createEmployee);
-}
-if (getEmployeeById || updateEmployee || deleteEmployee) {
-  const empIdRoute = router.route("/employees/:id");
-  if (getEmployeeById) empIdRoute.get(getEmployeeById);
-  if (updateEmployee) empIdRoute.put(updateEmployee);
-  if (deleteEmployee) empIdRoute.delete(deleteEmployee);
-}
+router.route("/employees")
+  .get(getEmployees)
+  .post(createEmployee);
+
+router.route("/employees/:id")
+  .get(getEmployeeById)
+  .put(updateEmployee)
+  .delete(deleteEmployee);
 
 // ==========================================
 // Scales Routes
 // ==========================================
-if (getScales || createScale) {
-  const salesRoute = router.route("/sales");
-  if (getScales) salesRoute.get(getScales);
-  if (createScale) salesRoute.post(createScale);
-}
-if (getScaleById || updateScale || deleteScale) {
-  const salesIdRoute = router.route("/sales/:id");
-  if (getScaleById) salesIdRoute.get(getScaleById);
-  if (updateScale) salesIdRoute.put(updateScale);
-  if (deleteScale) salesIdRoute.delete(deleteScale);
-}
+router.route("/sales")
+  .get(getScales)
+  .post(createScale);
+
+router.route("/sales/:id")
+  .get(getScaleById)
+  .put(updateScale)
+  .delete(deleteScale);
 
 // ==========================================
 // Workspace / Project & Task Routes
 // ==========================================
-if (getProjects || createProject) {
-  const projRoute = router.route("/projects");
-  if (getProjects) projRoute.get(getProjects);
-  if (createProject) projRoute.post(createProject);
-}
+router.route("/projects")
+  .get(getProjects)
+  .post(createProject);
 
-if (deleteProject) {
-  router.delete("/projects/:id", deleteProject);
-}
+router.delete("/projects/:id", deleteProject);
 
 router.post("/projects/:projectId/tasks", createTask);
 
-const taskRoute = router.route("/projects/tasks/:taskId");
-if (updateTask) taskRoute.patch(updateTask);
-if (deleteTask) taskRoute.delete(deleteTask);
+router.route("/projects/tasks/:taskId")
+  .patch(updateTask)
+  .delete(deleteTask);
 
-router.get('/setting', getSettings);
-router.put('/setting', updateSettings);
-router.post('/password', updatePassword);
+// ==========================================
+// Settings Routes
+// ==========================================
+router.get('/setting', protect, getSettings);
+router.put('/setting', protect, authorize("admin"), updateSettings);
+router.post('/password', protect, updatePassword);
+
+// Aliases matching the frontend API paths (SettingsContent.jsx)
+router.get('/settings', protect, getSettings);
+router.put('/settings', protect, authorize("admin"), updateSettings);
+router.post('/settings/password', protect, updatePassword);
+
 // ==========================================
 // Dashboard Routes
 // ==========================================
-router.get('/dashboard', getDashboardData);
+router.get('/dashboard', protect, getDashboardData);
 
 // ==========================================
 // Finance Routes
 // ==========================================
+if (getFinanceStats) router.get('/finance/stats', protect, getFinanceStats);
 
-// Finance overview stats (revenue, expenses, net profit, taxes)
-if (getFinanceStats) router.get('/finance/stats', getFinanceStats);
+// ==========================================
+// Reports Routes
+// ==========================================
+router.get('/reports', protect, getReports);
 
-// Invoice Routes
-if (getInvoices || createInvoice) {
-  const invoiceRoute = router.route("/invoices");
-  if (getInvoices) invoiceRoute.get(getInvoices);
-  if (createInvoice) invoiceRoute.post(createInvoice);
-}
-if (getInvoiceById || updateInvoice || deleteInvoice) {
-  const invoiceIdRoute = router.route("/invoices/:id");
-  if (getInvoiceById) invoiceIdRoute.get(getInvoiceById);
-  if (updateInvoice) invoiceIdRoute.put(updateInvoice);
-  if (deleteInvoice) invoiceIdRoute.delete(deleteInvoice);
-}
+router.route("/invoices")
+  .get(getInvoices)
+  .post(createInvoice);
 
-// Expense Routes
-if (getExpenses || createExpense) {
-  const expenseRoute = router.route("/expenses");
-  if (getExpenses) expenseRoute.get(getExpenses);
-  if (createExpense) expenseRoute.post(createExpense);
-}
-if (getExpenseById || updateExpense || deleteExpense) {
-  const expenseIdRoute = router.route("/expenses/:id");
-  if (getExpenseById) expenseIdRoute.get(getExpenseById);
-  if (updateExpense) expenseIdRoute.put(updateExpense);
-  if (deleteExpense) expenseIdRoute.delete(deleteExpense);
-}
+router.route("/invoices/:id")
+  .get(getInvoiceById)
+  .put(updateInvoice)
+  .delete(deleteInvoice);
 
-// Payment Routes
-if (getPayments || createPayment) {
-  const paymentRoute = router.route("/payments");
-  if (getPayments) paymentRoute.get(getPayments);
-  if (createPayment) paymentRoute.post(createPayment);
-}
-if (getPaymentById || updatePayment || deletePayment) {
-  const paymentIdRoute = router.route("/payments/:id");
-  if (getPaymentById) paymentIdRoute.get(getPaymentById);
-  if (updatePayment) paymentIdRoute.put(updatePayment);
-  if (deletePayment) paymentIdRoute.delete(deletePayment);
-}
+router.route("/expenses")
+  .get(getExpenses)
+  .post(createExpense);
+
+router.route("/expenses/:id")
+  .get(getExpenseById)
+  .put(updateExpense)
+  .delete(deleteExpense);
+
+router.route("/payments")
+  .get(getPayments)
+  .post(createPayment);
+
+router.route("/payments/:id")
+  .get(getPaymentById)
+  .put(updatePayment)
+  .delete(deletePayment);
 
 // ==========================================
 // Inventory Routes
 // ==========================================
-if (getInventoryItems || createInventoryItem) {
-  const inventoryRoute = router.route("/inventory");
-  if (getInventoryItems) inventoryRoute.get(getInventoryItems);
-  if (createInventoryItem) inventoryRoute.post(createInventoryItem);
-}
-if (getInventoryItemById || updateInventoryItem || deleteInventoryItem) {
-  const inventoryIdRoute = router.route("/inventory/:id");
-  if (getInventoryItemById) inventoryIdRoute.get(getInventoryItemById);
-  if (updateInventoryItem) inventoryIdRoute.put(updateInventoryItem);
-  if (deleteInventoryItem) inventoryIdRoute.delete(deleteInventoryItem);
-}
+router.route("/inventory")
+  .get(getInventoryItems)
+  .post(createInventoryItem);
 
-
-// ==========================================
-// Profile Routes
-// ==========================================
-router.get('/profile', getProfile);
-router.put('/profile', updateProfile);
+router.route("/inventory/:id")
+  .get(getInventoryItemById)
+  .put(updateInventoryItem)
+  .delete(deleteInventoryItem);
 
 // ==========================================
 // Upload Routes
 // ==========================================
-router.post('/upload', uploadImage);
+router.post('/upload', protect, uploadImage);
 router.post('/upload/public', uploadImage);
-
-// ==========================================
-// Auth Routes
-// ==========================================
-router.post('/auth/register', register);
-router.post('/auth/login', login);
-router.get('/auth/me', protect, getMe);
-router.get('/auth/google/callback', googleCallback);
 
 module.exports = router;

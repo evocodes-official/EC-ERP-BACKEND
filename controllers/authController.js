@@ -1,11 +1,18 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const config = require("../config/jwt");
 
-// Generate JWT token
 const generateToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || "7d",
+  return jwt.sign({ id: userId }, config.JWT_SECRET, {
+    expiresIn: config.JWT_EXPIRES_IN,
+  });
+};
+
+const generateRefreshToken = (userId) => {
+  if (!config.JWT_REFRESH_SECRET) return null;
+  return jwt.sign({ id: userId }, config.JWT_REFRESH_SECRET, {
+    expiresIn: config.JWT_REFRESH_EXPIRES_IN,
   });
 };
 
@@ -16,7 +23,6 @@ const register = async (req, res) => {
   try {
     const { name, email, password, company } = req.body;
 
-    // Basic validation
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
@@ -24,7 +30,6 @@ const register = async (req, res) => {
       });
     }
 
-    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
@@ -33,33 +38,27 @@ const register = async (req, res) => {
       });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create user
     const user = await User.create({
       name,
       email,
-      password: hashedPassword,
+      password,
       company: company || "",
     });
 
-    // Generate token
     const token = generateToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
+    if (refreshToken) {
+      user.refreshToken = refreshToken;
+      await user.save();
+    }
 
     res.status(201).json({
       success: true,
       message: "User registered successfully",
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        company: user.company,
-        avatarUrl: user.avatarUrl,
-        role: user.role,
-      },
+      refreshToken,
+      user,
     });
   } catch (err) {
     if (err.code === 11000) {
@@ -71,7 +70,7 @@ const register = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error during registration",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
@@ -83,7 +82,6 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Basic validation
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -91,7 +89,6 @@ const login = async (req, res) => {
       });
     }
 
-    // Find user (include password for comparison)
     const user = await User.findOne({ email }).select("+password");
     if (!user) {
       return res.status(401).json({
@@ -100,8 +97,7 @@ const login = async (req, res) => {
       });
     }
 
-    // Compare password
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({
         success: false,
@@ -109,27 +105,27 @@ const login = async (req, res) => {
       });
     }
 
-    // Generate token
+    user.lastLogin = new Date();
     const token = generateToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
+    if (refreshToken) {
+      user.refreshToken = refreshToken;
+    }
+    await user.save();
 
     res.status(200).json({
       success: true,
       message: "Login successful",
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        company: user.company,
-        avatarUrl: user.avatarUrl,
-        role: user.role,
-      },
+      refreshToken,
+      user,
     });
   } catch (err) {
     res.status(500).json({
       success: false,
       message: "Server error during login",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
@@ -139,8 +135,7 @@ const login = async (req, res) => {
 // @access  Private
 const getMe = async (req, res) => {
   try {
-    // req.user is populated by the auth middleware from the JWT
-    const user = await User.findById(req.user.id).select("-password");
+    const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -156,7 +151,88 @@ const getMe = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error",
-      error: err.message,
+      error: config.NODE_ENV === "development" ? err.message : undefined,
+    });
+  }
+};
+
+// @desc    Refresh access token
+// @route   POST /api/auth/refresh
+// @access  Public
+const refreshToken = async (req, res) => {
+  try {
+    const { refreshToken: token } = req.body;
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "Refresh token is required",
+      });
+    }
+
+    if (!config.JWT_REFRESH_SECRET) {
+      return res.status(500).json({
+        success: false,
+        message: "Refresh token not configured",
+      });
+    }
+
+    const decoded = jwt.verify(token, config.JWT_REFRESH_SECRET);
+    const user = await User.findById(decoded.id).select("+refreshToken");
+
+    if (!user || user.refreshToken !== token) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid refresh token",
+      });
+    }
+
+    const newAccessToken = generateToken(user._id);
+    const newRefreshToken = generateRefreshToken(user._id);
+
+    user.refreshToken = newRefreshToken;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Token refreshed successfully",
+      token: newAccessToken,
+      refreshToken: newRefreshToken,
+    });
+  } catch (err) {
+    if (err.name === "JsonWebTokenError" || err.name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired refresh token",
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: "Server error during token refresh",
+      error: config.NODE_ENV === "development" ? err.message : undefined,
+    });
+  }
+};
+
+// @desc    Logout user
+// @route   POST /api/auth/logout
+// @access  Private
+const logout = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("+refreshToken");
+    if (user) {
+      user.refreshToken = undefined;
+      await user.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Logged out successfully",
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Server error during logout",
+      error: config.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 };
@@ -165,8 +241,6 @@ const getMe = async (req, res) => {
 // @route   GET /api/auth/google/callback
 // @access  Public (Google OAuth redirect)
 const googleCallback = async (req, res) => {
-  // This is a placeholder. When Google OAuth is implemented,
-  // passport will attach the user profile to req.user.
   if (!req.user) {
     return res.status(401).json({
       success: false,
@@ -175,11 +249,16 @@ const googleCallback = async (req, res) => {
   }
 
   const token = generateToken(req.user._id);
+  const refreshToken = generateRefreshToken(req.user._id);
 
-  // Redirect to frontend with token, or return JSON
+  if (refreshToken) {
+    req.user.refreshToken = refreshToken;
+    await req.user.save();
+  }
+
   if (req.query.redirect) {
     return res.redirect(
-      `${process.env.FRONTEND_URL}?token=${token}&auth=google`
+      `${config.FRONTEND_URL}?token=${token}&auth=google`
     );
   }
 
@@ -187,13 +266,8 @@ const googleCallback = async (req, res) => {
     success: true,
     message: "Google authentication successful",
     token,
-    user: {
-      id: req.user._id,
-      name: req.user.name,
-      email: req.user.email,
-      avatarUrl: req.user.avatarUrl,
-      role: req.user.role,
-    },
+    refreshToken,
+    user: req.user,
   });
 };
 
@@ -201,5 +275,7 @@ module.exports = {
   register,
   login,
   getMe,
+  refreshToken,
+  logout,
   googleCallback,
 };
