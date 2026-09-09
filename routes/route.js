@@ -162,16 +162,16 @@ router.route("/sales/:id")
 // Workspace / Project & Task Routes
 // ==========================================
 router.route("/projects")
-  .get(getProjects)
-  .post(createProject);
+  .get(protect, getProjects)
+  .post(protect, createProject);
 
-router.delete("/projects/:id", deleteProject);
+router.delete("/projects/:id", protect, deleteProject);
 
-router.post("/projects/:projectId/tasks", createTask);
+router.post("/projects/:projectId/tasks", protect, createTask);
 
 router.route("/projects/tasks/:taskId")
-  .patch(updateTask)
-  .delete(deleteTask);
+  .patch(protect, updateTask)
+  .delete(protect, deleteTask);
 
 // ==========================================
 // Settings Routes

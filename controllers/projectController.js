@@ -4,12 +4,17 @@ const config = require('../config/jwt');
 
 exports.getProjects = async (req, res) => {
   try {
-    const projects = await Project.find().lean();
+    const userId = req.user._id || req.user.id;
 
-    const projectsWithTasks = await Promise.all(projects.map(async (project) => {
-      const tasks = await Task.find({ projectId: project._id }).lean();
-      return { ...project, id: project._id, tasks };
-    }));
+    // Filter only projects owned by the logged-in user
+    const projects = await Project.find({ userId }).lean();
+
+    const projectsWithTasks = await Promise.all(
+      projects.map(async (project) => {
+        const tasks = await Task.find({ projectId: project._id }).lean();
+        return { ...project, id: project._id, tasks };
+      })
+    );
 
     res.status(200).json({
       success: true,
@@ -28,6 +33,7 @@ exports.getProjects = async (req, res) => {
 exports.createProject = async (req, res) => {
   try {
     const { name, description, color } = req.body;
+    const userId = req.user._id || req.user.id;
 
     if (!name) {
       return res.status(400).json({
@@ -36,7 +42,13 @@ exports.createProject = async (req, res) => {
       });
     }
 
-    const newProject = await Project.create({ name, description, color });
+    // Attach userId to the newly created project
+    const newProject = await Project.create({
+      userId,
+      name,
+      description,
+      color,
+    });
 
     res.status(201).json({
       success: true,
@@ -59,12 +71,15 @@ exports.createProject = async (req, res) => {
 exports.deleteProject = async (req, res) => {
   try {
     const { id } = req.params;
-    const deletedProject = await Project.findByIdAndDelete(id);
+    const userId = req.user._id || req.user.id;
+
+    // Prevent deleting another account's project
+    const deletedProject = await Project.findOneAndDelete({ _id: id, userId });
 
     if (!deletedProject) {
       return res.status(404).json({
         success: false,
-        message: 'Project not found'
+        message: 'Project not found or unauthorized'
       });
     }
 
