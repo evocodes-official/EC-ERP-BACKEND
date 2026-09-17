@@ -13,7 +13,11 @@ const connectDB = async () => {
   const options = {
     maxPoolSize: 10,
     minPoolSize: 2,
-    serverSelectionTimeoutMS: 5000,
+    // Atlas connections need to complete TLS + SRV discovery + replica-set
+    // handshake; 5s was too short on this network, causing
+    // MongooseServerSelectionError: Server selection timed out after 5000 ms.
+    serverSelectionTimeoutMS: 30000,
+    connectTimeoutMS: 15000,
     socketTimeoutMS: 45000,
     family: 4,
     bufferCommands: false,
