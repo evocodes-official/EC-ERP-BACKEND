@@ -15,7 +15,6 @@ exports.getProjects = async (req, res) => {
         return { ...project, id: project._id, tasks };
       })
     );
-
     res.status(200).json({
       success: true,
       count: projectsWithTasks.length,

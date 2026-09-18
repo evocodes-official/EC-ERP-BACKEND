@@ -2,6 +2,8 @@ const Employee = require("../models/HR");
 const { Deal, User } = require("../models/crm");
 const Project = require("../models/project");
 const Task = require("../models/task");
+const Invoice = require("../models/Invoice");
+const Expense = require("../models/Expense");
 const config = require("../config/jwt");
 
 const getLastNMonths = (n = 7) => {
@@ -32,6 +34,8 @@ const calcTrend = (current, previous) => {
 const getDashboardData = async (req, res) => {
   try {
     const now = new Date();
+    const userId = req.user?._id || req.user?.id;
+    const projectUserFilter = userId ? { userId } : {};
 
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -53,6 +57,7 @@ const getDashboardData = async (req, res) => {
       revenueCurrentAgg,
       revenuePreviousAgg,
       monthlyRevenueAgg,
+      monthlyExpensesAgg,
       deals,
       users,
       employees,
@@ -67,32 +72,51 @@ const getDashboardData = async (req, res) => {
       recentHires,
     ] = await Promise.all([
       Employee.countDocuments(),
-      Employee.countDocuments({ joinedDate: { $gte: startOfMonth, $lt: startOfNextMonth } }),
-      Employee.countDocuments({ joinedDate: { $gte: startOfLastMonth, $lt: startOfMonth } }),
-      Deal.aggregate([
-        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+      Employee.countDocuments({ joinedDate: { $gte: startOfMonth,$lt: startOfNextMonth } }),
+      Employee.countDocuments({ joinedDate: { $gte: startOfLastMonth,$lt: startOfMonth } }),
+
+      // 1. Revenue from Paid Invoices (Last 30 days)
+      Invoice.aggregate([
+        { $match: { status: "PAID", createdAt: { $gte: thirtyDaysAgo } } },
         { $group: { _id: null, total: { $sum: "$amount" } } },
       ]),
-      Deal.aggregate([
-        { $match: { createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } } },
+
+      // 2. Revenue from Paid Invoices (30 - 60 days ago)
+      Invoice.aggregate([
+        { $match: { status: "PAID", createdAt: { $gte: sixtyDaysAgo,$lt: thirtyDaysAgo } } },
         { $group: { _id: null, total: { $sum: "$amount" } } },
       ]),
-      Deal.aggregate([
-        { $match: { createdAt: { $gte: chartStartDate, $lte: chartEndDate } } },
+
+      // 3. Monthly Revenue Trend from Invoices
+      Invoice.aggregate([
+        { $match: { status: "PAID", createdAt: { $gte: chartStartDate,$lte: chartEndDate } } },
         {
           $group: {
             _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
             total: { $sum: "$amount" },
-            count: { $sum: 1 },
+            count: { $sum: 1 },           },         },         {$sort: { "_id.year": 1, "_id.month": 1 } },
+      ]),
+
+      // 4. Monthly Expenses Trend from Paid Expenses
+      Expense.aggregate([
+        { $match: { status: "PAID", createdAt: { $gte: chartStartDate,$lte: chartEndDate } } },
+        {
+          $group: {
+            _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+            total: { $sum: "$amount" },
           },
         },
         { $sort: { "_id.year": 1, "_id.month": 1 } },
       ]),
+
       Deal.find().lean(),
       User.find().lean(),
       Employee.find().lean(),
       Employee.find({ role: { $regex: execRolePattern } }).sort({ joinedDate: 1 }).limit(6).lean(),
-      Project.find().sort({ createdAt: -1 }).lean(),
+
+      // Scoped by logged-in user
+      Project.find(projectUserFilter).sort({ createdAt: -1 }).lean(),
+
       Task.countDocuments({ status: { $ne: "done" } }),
       Task.countDocuments({ createdAt: { $gte: thirtyDaysAgo } }),
       Task.countDocuments({ status: "done", updatedAt: { $gte: thirtyDaysAgo } }),
@@ -109,7 +133,7 @@ const getDashboardData = async (req, res) => {
           $group: {
             _id: "$projectId",
             totalTasks: { $sum: 1 },
-            completedTasks: { $sum: { $cond: [{ $eq: ["$status", "done"] }, 1, 0] } },
+            completedTasks: { $sum: {$cond: [{ $eq: ["$status", "done"] }, 1, 0] } },
           },
         },
       ]),
@@ -126,13 +150,19 @@ const getDashboardData = async (req, res) => {
     const prevRevenue = revenuePreviousAgg.length > 0 ? revenuePreviousAgg[0].total : 0;
     const revenueTrend = calcTrend(monthlyRevenue, prevRevenue);
 
+    // Populate chart revenues and expenses
     const revenueMap = {};
     for (const item of monthlyRevenueAgg) {
       revenueMap[monthKey(item._id.year, item._id.month)] = item.total;
     }
+    const expenseMap = {};
+    for (const item of monthlyExpensesAgg) {
+      expenseMap[monthKey(item._id.year, item._id.month)] = item.total;
+    }
+
     const monthLabels = months.map((m) => m.label);
     const revenueByMonth = months.map((m) => revenueMap[monthKey(m.year, m.month)] || 0);
-    const expensesByMonth = new Array(months.length).fill(0);
+    const expensesByMonth = months.map((m) => expenseMap[monthKey(m.year, m.month)] || 0);
 
     const userIdToName = {};
     for (const user of users) {
@@ -173,7 +203,22 @@ const getDashboardData = async (req, res) => {
       status: emp.attendance === "O.O.O" ? "away" : "active",
     }));
 
-    const activeProjectsValue = projects.length;
+    // Build project task counts map
+    const taskCountMap = {};
+    for (const row of taskCountsByProject) {
+      taskCountMap[row._id ? row._id.toString() : ""] = {
+        totalTasks: row.totalTasks,
+        completedTasks: row.completedTasks,
+      };
+    }
+
+    // Active project definition: has tasks remaining or is newly initiated (total tasks == 0)
+    const activeProjects = projects.filter((project) => {
+      const counts = taskCountMap[project._id.toString()] || { totalTasks: 0, completedTasks: 0 };
+      return counts.totalTasks === 0 || counts.completedTasks < counts.totalTasks;
+    });
+
+    const activeProjectsValue = activeProjects.length;
     const projectsCreatedCurrent = projects.filter(
       (p) => p.createdAt >= startOfMonth && p.createdAt < startOfNextMonth
     ).length;
@@ -188,13 +233,6 @@ const getDashboardData = async (req, res) => {
     );
     const pendingTasksTrend = calcTrend(pendingTasksCount, pendingThenEstimate);
 
-    const taskCountMap = {};
-    for (const row of taskCountsByProject) {
-      taskCountMap[row._id ? row._id.toString() : ""] = {
-        totalTasks: row.totalTasks,
-        completedTasks: row.completedTasks,
-      };
-    }
     const projectsOverview = projects.slice(0, 8).map((project) => {
       const counts = taskCountMap[project._id.toString()] || {
         totalTasks: 0,
@@ -239,7 +277,7 @@ const getDashboardData = async (req, res) => {
         type: "task_completed",
         icon: "check-circle",
         title: `Task "${task.title}" Completed`,
-        description: `${projectNameById[task.projectId?.toString()] || "A project"} · ${task.category}`,
+        description: `${projectNameById[task.projectId?.toString()] || "A project"} · ${task.category || "General"}`,
         timestamp: task.updatedAt || task.createdAt,
       });
     }
