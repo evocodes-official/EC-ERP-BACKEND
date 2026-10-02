@@ -271,6 +271,66 @@ const googleCallback = async (req, res) => {
   });
 };
 
+// @desc    Change password with email verification
+// @route   POST /api/auth/change-password
+// @access  Public (requires email for identification)
+const changePassword = async (req, res) => {
+  try {
+    const { email, currentPassword, newPassword, confirmPassword } = req.body;
+
+    if (!email || !currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide email, current password, new password, and confirm password",
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New password and confirm password do not match",
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "New password must be at least 6 characters",
+      });
+    }
+
+    const user = await User.findOne({ email }).select("+password");
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Current password is incorrect",
+      });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Server error during password change",
+      error: config.NODE_ENV === "development" ? err.message : undefined,
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -278,4 +338,5 @@ module.exports = {
   refreshToken,
   logout,
   googleCallback,
+  changePassword,
 };

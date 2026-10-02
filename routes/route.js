@@ -97,7 +97,8 @@ const {
   getMe,
   refreshToken,
   logout,
-  googleCallback
+  googleCallback,
+  changePassword
 } = require('../controllers/authController');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -107,6 +108,7 @@ const { protect, authorize } = require('../middleware/auth');
 router.post('/auth/register', authLimiter, register);
 router.post('/auth/login', authLimiter, login);
 router.post('/auth/refresh', authLimiter, refreshToken);
+router.post('/auth/change-password', authLimiter, changePassword);
 router.get('/auth/google/callback', googleCallback);
 
 // ==========================================
